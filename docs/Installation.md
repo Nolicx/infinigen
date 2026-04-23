@@ -34,9 +34,9 @@ Once you have chosen your configuration, proceed to the relevant section below f
 
 ### Dependencies
 
-Please install anaconda or miniconda. Platform-specific instructions can be found [here](https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html)
+Please install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
-Then, install the following dependencies using the method of your choice. Examples are shown for Ubuntu, Mac ARM and Mac x86.
+Then, install the following system dependencies. Examples are shown for Ubuntu, Mac ARM and Mac x86.
 ```bash
 # on Ubuntu / Debian / WSL / etc
 sudo apt-get install wget cmake g++ libgles2-mesa-dev libglew-dev libglfw3-dev libglm-dev zlib1g-dev
@@ -46,40 +46,39 @@ arch -arm64 brew install wget cmake llvm open-mpi libomp glm glew zlib
 
 # on  Mac x86_64 (Intel)
 brew install wget cmake llvm open-mpi libomp glm glew zlib
-
-# on Conda. Useful when you don't have sudo permissions
-conda install conda-forge::gxx=11.4.0 mesalib glew glm menpo::glfw3
-export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
-export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
-export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 ```
 
 ### Installation
 
-First, download the repo and set up a conda environment (you may need to [install conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html))
+Clone the repo and install:
+
 ```bash
 git clone https://github.com/princeton-vl/infinigen.git
 cd infinigen
-conda create --name infinigen python=3.11
-conda activate infinigen
 ```
 
-Then, install the infinigen package using one of the options below:
+Then install using one of the options below. uv will automatically create a `.venv` with Python 3.11.
 
 ```bash
-# Minimal install (No terrain or opengl GT, ok for Infinigen-Indoors or single-object generation) 
-INFINIGEN_MINIMAL_INSTALL=True pip install -e .
+# Minimal install (no terrain or OpenGL GT, ok for Infinigen-Indoors or single-object generation)
+INFINIGEN_MINIMAL_INSTALL=True uv sync
 
 # Full install (Terrain & OpenGL-GT enabled, needed for Infinigen-Nature HelloWorld)
-pip install -e ".[terrain,vis]"
+uv sync --extra terrain --extra vis
 
 # Installation for simulation assets
-pip install -e ".[sim]"
+uv sync --extra sim
 
 # Developer install (includes pytest, ruff, other recommended dev tools)
-pip install -e ".[dev,terrain,vis]"
+INFINIGEN_MINIMAL_INSTALL=True uv sync --extra dev --extra vis
 pre-commit install
+```
+
+Activate the environment or use `uv run` to execute commands:
+```bash
+source .venv/bin/activate
+# or directly:
+uv run python -m infinigen ...
 ```
 
 :exclamation: If you encounter any issues with the above, please add `-vv > logs.txt 2>&1` to the end of your command and run again, then provide the resulting logs.txt file as an attachment when making a Github Issue.
@@ -90,11 +89,9 @@ On Linux / Mac / WSL:
 ```bash
 git clone https://github.com/princeton-vl/infinigen.git
 cd infinigen
-conda create --name infinigen python=3.11
-conda activate infinigen 
 ```
 
-Then, install using one of the options below:
+Activate your Python environment of choice, then install using one of the options below:
 ```bash
 
 # Minimal installation (recommended setting for use in the Blender UI)
@@ -132,7 +129,7 @@ To run without either, use `docker-run-no-gpu-opengl`
 
 Note: `make docker-setup` can be skipped if not using OpenGL.
 
-Use `exit` to exit the container and `docker exec -it infinigen bash` to re-enter the container as needed. Remember to `conda activate infinigen` before running scenes.
+Use `exit` to exit the container and `docker exec -it infinigen bash` to re-enter the container as needed.
 
 **Docker on Windows**
 
