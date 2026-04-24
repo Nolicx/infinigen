@@ -386,122 +386,235 @@ class BlueprintSolidifier:
 
         return State(objs=obj_states)
 
+    # def make_room(self, state, name):
+    #     obj_st = state.objs[name]
+    #     obj = polygon2obj(
+    #         shapely.segmentize(
+    #             self.constants.canonicalize(obj_st.polygon), self.constants.door_width
+    #         ),
+    #         True,
+    #         dissolve=False,
+    #     )
+    #     butil.modify_mesh(obj, "WELD", merge_threshold=0.01)
+    #     butil.modify_mesh(
+    #         obj, "SOLIDIFY", thickness=self.constants.wall_height, offset=-1
+    #     )
+    #     obj.name = name
+    #     self.tag(obj, False)
+    #     center = read_center(obj)
+    #     exterior_centers = []
+
+    #     exterior = next(k for k in state.objs if room_type(k) == Semantics.Exterior)
+    #     exterior_edges = list(
+    #         r.value for r in state.objs[exterior].relations if r.target_name == name
+    #     )
+    #     if len(exterior_edges) == 0:
+    #         exterior = np.zeros(len(obj.data.polygons), dtype=bool)
+    #     else:
+    #         exterior_edge = exterior_edges[0]
+    #         for ls in exterior_edge.geoms:
+    #             for u, v in zip(ls.coords[:-1], ls.coords[1:]):
+    #                 exterior_centers.append(((u[0] + v[0]) / 2, (u[1] + v[1]) / 2))
+    #         if len(exterior_centers) > 0:
+    #             exterior = (
+    #                 np.abs(
+    #                     center[:, np.newaxis, :2]
+    #                     - np.array(exterior_centers)[np.newaxis]
+    #                 ).sum(-1)
+    #                 < self.constants.wall_thickness * 4
+    #             ).any(-1)
+    #         else:
+    #             exterior = np.zeros(len(obj.data.polygons), dtype=bool)
+    #     write_attr_data(
+    #         obj, f"{PREFIX}{t.Subpart.Interior.value}", ~exterior, "BOOLEAN", "FACE"
+    #     )
+    #     assert len(obj.data.vertices) > 0
+
+    #     # floor and ceiling masks
+    #     floor_mask = read_attr_data(
+    #         obj, f"{PREFIX}{t.Subpart.SupportSurface.value}", "FACE"
+    #     ).astype(bool)
+    #     ceiling_mask = read_attr_data(
+    #         obj, f"{PREFIX}{t.Subpart.Ceiling.value}", "FACE"
+    #     ).astype(bool)
+
+    #     # Generate sub-objects for surface and ceiling
+    #     sub_objects = []
+    #     for mask, thickness in [
+    #         (floor_mask, self.constants.floor_thickness),
+    #         (ceiling_mask, self.constants.ceiling_thickness),
+    #     ]:
+    #         if not mask.any():
+    #             continue
+    #         sub = obj.copy()
+    #         sub.data = obj.data.copy()
+    #         bpy.context.collection.objects.link(sub)
+    #         # delete non-fitting faces
+    #         bpy.context.view_layer.objects.active = sub
+    #         bpy.ops.object.mode_set(mode="OBJECT")
+    #         for i, poly in enumerate(sub.data.polygons):
+    #             poly.select = not mask[i]
+    #         bpy.ops.object.mode_set(mode="EDIT")
+    #         bpy.ops.mesh.delete(type="FACE")
+    #         bpy.ops.object.mode_set(mode="OBJECT")
+    #         # apply own thickness
+    #         sub.vertex_groups.new(name="visible_")
+    #         butil.modify_mesh(
+    #             sub,
+    #             "SOLIDIFY",
+    #             thickness=thickness,
+    #             offset=-1,
+    #             use_even_offset=True,
+    #             shell_vertex_group="visible_",
+    #             use_quality_normals=True,
+    #         )
+    #         write_attribute(
+    #             sub, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
+    #         )
+    #         sub.vertex_groups.remove(sub.vertex_groups["visible_"])
+    #         sub_objects.append(sub)
+
+    #     # delete original floor and ceiling
+    #     bpy.context.view_layer.objects.active = obj
+    #     combined_mask = floor_mask | ceiling_mask
+    #     bpy.ops.object.mode_set(mode="OBJECT")
+    #     for i, poly in enumerate(obj.data.polygons):
+    #         poly.select = combined_mask[i]
+    #     bpy.ops.object.mode_set(mode="EDIT")
+    #     bpy.ops.mesh.delete(type="FACE")
+    #     bpy.ops.object.mode_set(mode="OBJECT")
+
+    #     obj.vertex_groups.new(name="visible_")
+    #     butil.modify_mesh(
+    #         obj,
+    #         "SOLIDIFY",
+    #         thickness=self.constants.wall_thickness / 2,
+    #         offset=-1,
+    #         use_even_offset=True,
+    #         shell_vertex_group="visible_",
+    #         use_quality_normals=True,
+    #     )
+    #     write_attribute(
+    #         obj, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
+    #     )
+    #     obj.vertex_groups.remove(obj.vertex_groups["visible_"])
+
+    #     # connect all parts
+    #     if sub_objects:
+    #         obj = butil.join_objects([obj] + sub_objects)
+    #     return obj
+
     def make_room(self, state, name):
         obj_st = state.objs[name]
-        obj = polygon2obj(
-            shapely.segmentize(
-                self.constants.canonicalize(obj_st.polygon), self.constants.door_width
-            ),
-            True,
-            dissolve=False,
-        )
-        butil.modify_mesh(obj, "WELD", merge_threshold=0.01)
-        butil.modify_mesh(
-            obj, "SOLIDIFY", thickness=self.constants.wall_height, offset=-1
-        )
-        obj.name = name
-        self.tag(obj, False)
-        center = read_center(obj)
-        exterior_centers = []
+        ft = self.constants.floor_thickness
+        ct = self.constants.ceiling_thickness
+        wt = self.constants.wall_thickness
+        wh = self.constants.wall_height
+        interior_height = wh - ft - ct
 
+        room_poly = shapely.segmentize(
+            self.constants.canonicalize(obj_st.polygon), self.constants.door_width
+        )
+        # outer_poly = inner_poly.buffer(wt, join_style="mitre")
+        outer_poly = room_poly  # Außenwand = bisherige Innengrenze
+        inner_poly = room_poly.buffer(-wt, join_style="mitre")  # Innenraum: wt kleiner
+
+        # Floor slab: inner polygon, z=0 bis z=ft
+        floor_obj = polygon2obj(inner_poly, reversed=True, dissolve=False)
+        butil.modify_mesh(floor_obj, "WELD", merge_threshold=0.01)
+        butil.modify_mesh(floor_obj, "SOLIDIFY", thickness=ft, offset=-1)
+
+        # Wall ring: outer box minus inner box (Boolean), z=ft bis z=wh-ct
+        wall_obj = polygon2obj(outer_poly, z=ft, reversed=True, dissolve=False)
+        butil.modify_mesh(wall_obj, "WELD", merge_threshold=0.01)
+        butil.modify_mesh(wall_obj, "SOLIDIFY", thickness=interior_height, offset=-1)
+
+        wall_cutter = polygon2obj(
+            inner_poly, z=ft - 0.001, reversed=True, dissolve=False
+        )
+        butil.modify_mesh(wall_cutter, "WELD", merge_threshold=0.01)
+        butil.modify_mesh(
+            wall_cutter, "SOLIDIFY", thickness=interior_height + 0.002, offset=-1
+        )
+        prepare_for_boolean(wall_obj)
+        prepare_for_boolean(wall_cutter)
+        butil.modify_mesh(
+            wall_obj,
+            "BOOLEAN",
+            object=wall_cutter,
+            operation="DIFFERENCE",
+            use_self=True,
+            use_hole_tolerant=True,
+        )
+        bpy.data.objects.remove(wall_cutter, do_unlink=True)
+
+        # Ceiling slab: inner polygon, z=wh-ct bis z=wh
+        ceil_obj = polygon2obj(inner_poly, z=wh - ct, reversed=True, dissolve=False)
+        butil.modify_mesh(ceil_obj, "WELD", merge_threshold=0.01)
+        butil.modify_mesh(ceil_obj, "SOLIDIFY", thickness=ct, offset=-1)
+
+        # Exterior-Erkennung (für Außenwände)
         exterior = next(k for k in state.objs if room_type(k) == Semantics.Exterior)
         exterior_edges = list(
             r.value for r in state.objs[exterior].relations if r.target_name == name
         )
-        if len(exterior_edges) == 0:
-            exterior = np.zeros(len(obj.data.polygons), dtype=bool)
-        else:
-            exterior_edge = exterior_edges[0]
-            for ls in exterior_edge.geoms:
+        exterior_centers = []
+        for ee in exterior_edges:
+            for ls in ee.geoms:
                 for u, v in zip(ls.coords[:-1], ls.coords[1:]):
                     exterior_centers.append(((u[0] + v[0]) / 2, (u[1] + v[1]) / 2))
-            if len(exterior_centers) > 0:
-                exterior = (
-                    np.abs(
-                        center[:, np.newaxis, :2]
-                        - np.array(exterior_centers)[np.newaxis]
-                    ).sum(-1)
-                    < self.constants.wall_thickness * 4
-                ).any(-1)
-            else:
-                exterior = np.zeros(len(obj.data.polygons), dtype=bool)
-        write_attr_data(
-            obj, f"{PREFIX}{t.Subpart.Interior.value}", ~exterior, "BOOLEAN", "FACE"
-        )
+        if exterior_centers:
+            center = read_center(wall_obj) + wall_obj.location
+            is_exterior = (
+                np.abs(
+                    center[:, np.newaxis, :2] - np.array(exterior_centers)[np.newaxis]
+                ).sum(-1)
+                < wt * 4
+            ).any(-1)
+        else:
+            is_exterior = np.zeros(len(wall_obj.data.polygons), bool)
+
+        # Tagging
+        def tag_slab(obj, floor=False, wall=False, ceiling=False, exterior_mask=None):
+            n = len(obj.data.polygons)
+            full = np.ones(n, bool)
+            empty = np.zeros(n, bool)
+            write_attr_data(
+                obj,
+                f"{PREFIX}{t.Subpart.SupportSurface.value}",
+                full if floor else empty,
+                "BOOLEAN",
+                "FACE",
+            )
+            write_attr_data(
+                obj,
+                f"{PREFIX}{t.Subpart.Ceiling.value}",
+                full if ceiling else empty,
+                "BOOLEAN",
+                "FACE",
+            )
+            write_attr_data(
+                obj,
+                f"{PREFIX}{t.Subpart.Wall.value}",
+                full if wall else empty,
+                "BOOLEAN",
+                "FACE",
+            )
+            write_attr_data(
+                obj, f"{PREFIX}{t.Subpart.Visible.value}", full, "BOOLEAN", "FACE"
+            )
+            interior = ~exterior_mask if exterior_mask is not None else full
+            write_attr_data(
+                obj, f"{PREFIX}{t.Subpart.Interior.value}", interior, "BOOLEAN", "FACE"
+            )
+
+        tag_slab(floor_obj, floor=True)
+        tag_slab(wall_obj, wall=True, exterior_mask=is_exterior)
+        tag_slab(ceil_obj, ceiling=True)
+
+        obj = butil.join_objects([floor_obj, wall_obj, ceil_obj])
+        obj.name = name
         assert len(obj.data.vertices) > 0
-
-        # floor and ceiling masks
-        floor_mask = read_attr_data(
-            obj, f"{PREFIX}{t.Subpart.SupportSurface.value}", "FACE"
-        ).astype(bool)
-        ceiling_mask = read_attr_data(
-            obj, f"{PREFIX}{t.Subpart.Ceiling.value}", "FACE"
-        ).astype(bool)
-
-        # Generate sub-objects for surface and ceiling
-        sub_objects = []
-        for mask, thickness in [
-            (floor_mask, self.constants.floor_thickness),
-            (ceiling_mask, self.constants.ceiling_thickness),
-        ]:
-            if not mask.any():
-                continue
-            sub = obj.copy()
-            sub.data = obj.data.copy()
-            bpy.context.collection.objects.link(sub)
-            # delete non-fitting faces
-            bpy.context.view_layer.objects.active = sub
-            bpy.ops.object.mode_set(mode="OBJECT")
-            for i, poly in enumerate(sub.data.polygons):
-                poly.select = not mask[i]
-            bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.delete(type="FACE")
-            bpy.ops.object.mode_set(mode="OBJECT")
-            # apply own thickness
-            sub.vertex_groups.new(name="visible_")
-            butil.modify_mesh(
-                sub,
-                "SOLIDIFY",
-                thickness=thickness,
-                offset=-1,
-                use_even_offset=True,
-                shell_vertex_group="visible_",
-                use_quality_normals=True,
-            )
-            write_attribute(
-                sub, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
-            )
-            sub.vertex_groups.remove(sub.vertex_groups["visible_"])
-            sub_objects.append(sub)
-
-        # delete original floor and ceiling
-        bpy.context.view_layer.objects.active = obj
-        combined_mask = floor_mask | ceiling_mask
-        bpy.ops.object.mode_set(mode="OBJECT")
-        for i, poly in enumerate(obj.data.polygons):
-            poly.select = combined_mask[i]
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.delete(type="FACE")
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-        obj.vertex_groups.new(name="visible_")
-        butil.modify_mesh(
-            obj,
-            "SOLIDIFY",
-            thickness=self.constants.wall_thickness / 2,
-            offset=-1,
-            use_even_offset=True,
-            shell_vertex_group="visible_",
-            use_quality_normals=True,
-        )
-        write_attribute(
-            obj, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
-        )
-        obj.vertex_groups.remove(obj.vertex_groups["visible_"])
-
-        # connect all parts
-        if sub_objects:
-            obj = butil.join_objects([obj] + sub_objects)
         return obj
 
     def make_interior_cutters(self, neighbours, shared_edges, segments, exterior):
@@ -631,7 +744,11 @@ class BlueprintSolidifier:
         else:
             x = uniform(min(x, x_) + m, max(x, x_) - m)
             z_rot = 0 if direction[1] > 0 else np.pi
-        cutter.location = x, y, self.constants.door_size / 2 + wt / 2
+        cutter.location = (
+            x,
+            y,
+            self.constants.door_size / 2 + self.constants.floor_thickness,
+        )
         cutter.rotation_euler[-1] = z_rot
         cutter.name = t.Semantics.Door.value
         self.tag(cutter)
@@ -654,7 +771,7 @@ class BlueprintSolidifier:
         cutter.location = (
             lam * x + (1 - lam) * x_,
             lam * y + (1 - lam) * y_,
-            self.constants.door_size / 2 + wt / 2,
+            self.constants.door_size / 2 + self.constants.floor_thickness,
         )
         cutter.rotation_euler = 0, 0, np.arctan2(y_ - y, x_ - x)
         cutter.name = t.Semantics.Entrance.value
@@ -665,20 +782,24 @@ class BlueprintSolidifier:
         cutters = []
         for x, y, x_, y_ in split_mls(mls, self.constants.door_width):
             length = np.linalg.norm([y_ - y, x_ - x])
+            # wt = self.constants.wall_thickness
+            # wm = self.constants.window_margin
             wt = self.constants.wall_thickness
             wm = self.constants.window_margin
+            ft = self.constants.floor_thickness
+            ct = self.constants.ceiling_thickness
 
             if rg(is_panoramic) and self.constants.wall_height < 4:
                 x_scale = length / 2 - wm
                 lam = 1 / 2
-                z_scale = (self.constants.wall_height - wt) / 2 - _snap
-                z_loc = z_scale + wt / 2 + _snap
+                z_scale = self.constants.wall_height / 2 - max(ft, ct) - _snap
+                z_loc = z_scale + max(ft, ct) + _snap
             else:
                 x_scale = uniform(self.constants.door_width / 2, length / 2 - wm)
                 m = (x_scale + wm) / length
                 lam = uniform(m, 1 - m)
                 z_scale = self.constants.window_size / 2
-                z_loc = z_scale + self.constants.window_height + wt / 2
+                z_loc = z_scale + self.constants.window_height + ft
 
             cutter = new_cube()
             cutter.scale = x_scale, wt, z_scale
@@ -698,6 +819,8 @@ class BlueprintSolidifier:
         es = [es] if isinstance(es, LineString) else es.geoms
         lines = []
         wt = self.constants.wall_thickness
+        ft = self.constants.floor_thickness
+        ct = self.constants.ceiling_thickness
         for ls in es:
             coords = np.array(ls.coords[:])
             if len(coords) < 2:
@@ -724,13 +847,17 @@ class BlueprintSolidifier:
                 bpy.ops.mesh.select_all(action="SELECT")
                 bpy.ops.mesh.extrude_region_move(
                     TRANSFORM_OT_translate={
-                        "value": (0, 0, self.constants.wall_height - wt - 2 * _snap)
+                        "value": (
+                            0,
+                            0,
+                            self.constants.wall_height - 2 * max(ft, ct) - 2 * _snap,
+                        )
                     }
                 )
                 bpy.ops.mesh.select_mode(type="FACE")
                 bpy.ops.mesh.select_all(action="SELECT")
                 bpy.ops.mesh.normals_make_consistent(inside=False)
-            cutter.location[-1] += wt / 2 + _snap
+            cutter.location[-1] += ft + _snap
             cutter.name = t.Semantics.Open.value
             self.tag(cutter)
             cutters.append(cutter)
