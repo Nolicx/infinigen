@@ -1,0 +1,16 @@
+include 'infinigen_examples/configs_indoor/base_indoors.gin'
+include 'infinigen_examples/configs_indoor/fast_solve.gin'
+include 'infinigen_examples/configs_indoor/singleroom.gin'
+include 'infinigen_examples/configs_indoor/disable/no_objects.gin'
+
+compose_indoors.terrain_enabled = False
+compose_indoors.floating_objs_enabled = False
+compose_indoors.skirting_floor_enabled = False
+compose_indoors.skirting_ceiling_enabled = False
+
+RoomConstants.global_params.wall_height = 3.56
+RoomConstants.global_params.wall_thickness = 0.15
+RoomConstants.global_params.floor_thickness = 0.28
+RoomConstants.global_params.ceiling_thickness = 0.28
+RoomConstants.n_stories = 1
+RoomConstants.fixed_contour = True
