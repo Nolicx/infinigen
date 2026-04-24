@@ -28,9 +28,14 @@ class RoomConstants:
         fixed_contour=("bool", 0.5),
     ):
         self.n_stories = rg(n_stories)
-        self.unit, self.segment_margin, self.wall_thickness, self.wall_height = (
-            self.global_params().values()
-        )
+        (
+            self.unit,
+            self.segment_margin,
+            self.wall_thickness,
+            self.wall_height,
+            self.floor_thickness,
+            self.ceiling_thickness,
+        ) = self.global_params().values()
         self.door_width, self.door_margin, self.door_size = self.door_params().values()
         (
             self.max_window_length,
@@ -54,14 +59,26 @@ class RoomConstants:
         segment_margin=1.4,
         wall_thickness=("uniform", 0.2, 0.3),
         wall_height=("uniform", 2.8, 3.2),
+        floor_thickness=None,
+        ceiling_thickness=None,
     ):
         wall_thickness = rg(wall_thickness)
         wall_height = rg(wall_height)
+        floor_thickness = (
+            rg(floor_thickness) if floor_thickness is not None else wall_thickness / 2
+        )
+        ceiling_thickness = (
+            rg(ceiling_thickness)
+            if ceiling_thickness is not None
+            else wall_thickness / 2
+        )
         return {
             "unit": unit,
             "segment_margin": segment_margin,
             "wall_thickness": wall_thickness,
             "wall_height": wall_height,
+            "floor_thickness": floor_thickness,
+            "ceiling_thickness": ceiling_thickness,
         }
 
     def door_params(

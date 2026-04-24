@@ -35,7 +35,7 @@ from infinigen.core.constraints.example_solver.state_def import (
     RelationState,
     State,
 )
-from infinigen.core.surface import write_attr_data
+from infinigen.core.surface import read_attr_data, write_attr_data
 from infinigen.core.tagging import PREFIX
 from infinigen.core.tags import Semantics
 from infinigen.core.util import blender as butil
@@ -294,11 +294,18 @@ class BlueprintSolidifier:
         for obj in rooms.values():
             butil.modify_mesh(obj, "TRIANGULATE", min_vertices=3)
             co = read_co(obj)
-            m = wt / 2 + _snap
+            # m = wt / 2 + _snap
+            # low = np.abs(co[:, -1] - m) < _eps
+            # high = np.abs(co[:, -1] - self.constants.wall_height + m) < _eps
+            # co[:, -1] = np.where(low, wt / 2, co[:, -1])
+            # co[:, -1] = np.where(high, self.constants.wall_height - wt / 2, co[:, -1])
+            ft = self.constants.floor_thickness
+            ct = self.constants.ceiling_thickness
+            m = max(ft, ct) + _snap
             low = np.abs(co[:, -1] - m) < _eps
             high = np.abs(co[:, -1] - self.constants.wall_height + m) < _eps
-            co[:, -1] = np.where(low, wt / 2, co[:, -1])
-            co[:, -1] = np.where(high, self.constants.wall_height - wt / 2, co[:, -1])
+            co[:, -1] = np.where(low, ft, co[:, -1])
+            co[:, -1] = np.where(high, self.constants.wall_height - ct, co[:, -1])
             write_co(obj, co)
             tagging.tag_object(obj)
 
@@ -306,11 +313,18 @@ class BlueprintSolidifier:
             offset = np.array(obj.location)[np.newaxis, :]
             offset[:, 2] -= w * self.level
             co = read_co(obj) + offset
-            m = wt / 2 + _snap
+            # m = wt / 2 + _snap
+            # low = np.abs(co[:, -1] - m) < _eps
+            # high = np.abs(co[:, -1] - self.constants.wall_height + m) < _eps
+            # co[:, -1] = np.where(low, wt / 2, co[:, -1])
+            # co[:, -1] = np.where(high, self.constants.wall_height - wt / 2, co[:, -1])
+            ft = self.constants.floor_thickness
+            ct = self.constants.ceiling_thickness
+            m = max(ft, ct) + _snap
             low = np.abs(co[:, -1] - m) < _eps
             high = np.abs(co[:, -1] - self.constants.wall_height + m) < _eps
-            co[:, -1] = np.where(low, wt / 2, co[:, -1])
-            co[:, -1] = np.where(high, self.constants.wall_height - wt / 2, co[:, -1])
+            co[:, -1] = np.where(low, ft, co[:, -1])
+            co[:, -1] = np.where(high, self.constants.wall_height - ct, co[:, -1])
             write_co(obj, co - offset)
             tagging.tag_object(obj)
 
@@ -416,6 +430,60 @@ class BlueprintSolidifier:
         )
         assert len(obj.data.vertices) > 0
 
+        # floor and ceiling masks
+        floor_mask = read_attr_data(
+            obj, f"{PREFIX}{t.Subpart.SupportSurface.value}", "FACE"
+        ).astype(bool)
+        ceiling_mask = read_attr_data(
+            obj, f"{PREFIX}{t.Subpart.Ceiling.value}", "FACE"
+        ).astype(bool)
+
+        # Generate sub-objects for surface and ceiling
+        sub_objects = []
+        for mask, thickness in [
+            (floor_mask, self.constants.floor_thickness),
+            (ceiling_mask, self.constants.ceiling_thickness),
+        ]:
+            if not mask.any():
+                continue
+            sub = obj.copy()
+            sub.data = obj.data.copy()
+            bpy.context.collection.objects.link(sub)
+            # delete non-fitting faces
+            bpy.context.view_layer.objects.active = sub
+            bpy.ops.object.mode_set(mode="OBJECT")
+            for i, poly in enumerate(sub.data.polygons):
+                poly.select = not mask[i]
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.delete(type="FACE")
+            bpy.ops.object.mode_set(mode="OBJECT")
+            # apply own thickness
+            sub.vertex_groups.new(name="visible_")
+            butil.modify_mesh(
+                sub,
+                "SOLIDIFY",
+                thickness=thickness,
+                offset=-1,
+                use_even_offset=True,
+                shell_vertex_group="visible_",
+                use_quality_normals=True,
+            )
+            write_attribute(
+                sub, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
+            )
+            sub.vertex_groups.remove(sub.vertex_groups["visible_"])
+            sub_objects.append(sub)
+
+        # delete original floor and ceiling
+        bpy.context.view_layer.objects.active = obj
+        combined_mask = floor_mask | ceiling_mask
+        bpy.ops.object.mode_set(mode="OBJECT")
+        for i, poly in enumerate(obj.data.polygons):
+            poly.select = combined_mask[i]
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.delete(type="FACE")
+        bpy.ops.object.mode_set(mode="OBJECT")
+
         obj.vertex_groups.new(name="visible_")
         butil.modify_mesh(
             obj,
@@ -430,6 +498,10 @@ class BlueprintSolidifier:
             obj, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
         )
         obj.vertex_groups.remove(obj.vertex_groups["visible_"])
+
+        # connect all parts
+        if sub_objects:
+            obj = butil.join_objects([obj] + sub_objects)
         return obj
 
     def make_interior_cutters(self, neighbours, shared_edges, segments, exterior):
@@ -666,9 +738,9 @@ class BlueprintSolidifier:
 
     def tag(self, obj, visible=True):
         center = read_center(obj) + obj.location
-        high = self.constants.wall_height - self.constants.wall_thickness / 2
+        high = self.constants.wall_height - self.constants.ceiling_thickness
         z = center[:, -1]
-        low = self.constants.wall_thickness / 2
+        low = self.constants.ceiling_thickness
         ceiling = (z > high - _eps) | (np.abs(z - high + _snap) < _eps)
         floor = (z < low + _eps) | (np.abs(z - low - _snap) < _eps)
         wall = ~(ceiling | floor)
