@@ -512,12 +512,19 @@ class BlueprintSolidifier:
         wh = self.constants.wall_height
         interior_height = wh - ft - ct
 
+        # So kann ein Raum durch die Innengröße, also excluding der Wände, Decke und Boden (Innenmaße) angegeben werden.
+        # Bei mehreren Räumen überlappen dann aber die Wände ineinander
+        # inner_poly = shapely.segmentize(
+        #     self.constants.canonicalize(obj_st.polygon), self.constants.door_width
+        # )
+        # outer_poly = inner_poly.buffer(wt, join_style="mitre")
+
+        # So gibt man die Gesamtmaße, also Innen + Wände/Decke/Böden an, aber bei mehreren Räumen gibts keine Überlappungen
         room_poly = shapely.segmentize(
             self.constants.canonicalize(obj_st.polygon), self.constants.door_width
         )
-        # outer_poly = inner_poly.buffer(wt, join_style="mitre")
-        outer_poly = room_poly  # Außenwand = bisherige Innengrenze
-        inner_poly = room_poly.buffer(-wt, join_style="mitre")  # Innenraum: wt kleiner
+        outer_poly = room_poly
+        inner_poly = room_poly.buffer(-wt, join_style="mitre")
 
         # Floor slab: inner polygon, z=0 bis z=ft
         floor_obj = polygon2obj(inner_poly, reversed=True, dissolve=False)
