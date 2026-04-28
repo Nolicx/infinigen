@@ -108,7 +108,7 @@ exclude = [
 ]
 
 [tool.setuptools.package-data]
-"*" = ["*.gin", "*.txt", "*.json"]
+"*" = ["*.gin", "*.txt", "*.json", "*.html"]
 
 # Must be specified as paths relative to infinigen/
 "infinigen" = [
