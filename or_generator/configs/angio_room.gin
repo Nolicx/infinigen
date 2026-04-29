@@ -1,10 +1,15 @@
 include 'or_generator/configs/base_or.gin'
 
-Solver.floor_plan = "or_generator.configs.floor_plans.angio_room.angio_room_simple"
+# TODO: Check if 2 is necessary when only one room is used
+restrict_solving.solve_max_rooms=2 
 
-restrict_solving.solve_max_rooms=2
+#### Angiography room layout ####
 
-place_or_equipment.blend_path = "or_generator/assets/static_assets/source/C_Arm/zeego_4_2.blend"
+Solver.floor_plan = "or_generator.configs.floor_plans.angio_room.angio_room"
+
+#### C-Arm placement and configuration ####
+
+place_or_equipment.blend_path = "or_generator/assets/static_assets/source/AngiographySystem/zeego_4_2.blend"
 place_or_equipment.zeego_armature = "zeego_armature"
 place_or_equipment.zeego_location = (4.0, 3.15, 0.28)
 place_or_equipment.zeego_rotation_deg = (0.0, 0.0, 0.0)
@@ -14,3 +19,13 @@ place_or_equipment.table_armature = "table_armature"
 place_or_equipment.table_location = (7.5, 3.15, 0.28)
 place_or_equipment.table_rotation_deg = (180.0, 0.0, 180.0)
 place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
+
+#### Camera placement and animation ####
+
+# 1. Setting initial pose of n cameras:
+
+# compute_base_views: Setting initial pose of n cameras
+
+# camera_pose_proposal: Specify sampling strategy to get pose proposals für initial camera position
+
+# 2. Animate n cameras creating nxm frames (m number of frames per camera)

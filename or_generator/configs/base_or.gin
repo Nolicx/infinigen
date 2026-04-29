@@ -8,6 +8,8 @@ compose_indoors.floating_objs_enabled = False
 compose_indoors.skirting_floor_enabled = False
 compose_indoors.skirting_ceiling_enabled = False
 
+#### Basic room configuration ####
+
 RoomConstants.global_params.wall_height = 3.56
 RoomConstants.global_params.wall_thickness = 0.15
 RoomConstants.global_params.floor_thickness = 0.28

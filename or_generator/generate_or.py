@@ -236,9 +236,20 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
     nonroom_objs = [
         o.obj for o in state.objs.values() if t.Semantics.Room not in o.tags
     ]
+    # TODO: Load C-ARM as a static asset via static_object_category and manipulate afterwards
+    # Necessary to determinte randomized C-ARM position, employ constraints and to determine the center point of the C-ARM
+    # For now we add C-ARM manually to nonroom_objs
+    angio_armatures = place_or_equipment()
+    # Extract only mesh objects of armature to build scene bvh
+    angio_objs = [
+        c for arm in angio_armatures for c in arm.children if c.type == "MESH"
+    ]
+    nonroom_objs += angio_objs
+
     room_objs = [o.obj for o in state.objs.values() if t.Semantics.Room in o.tags]
     scene_objs = solved_rooms + nonroom_objs
 
+    # Customized camera positioning to always focus on angiography system
     def pose_cameras():
         scene_preprocessed = placement.camera.camera_selection_preprocessing(
             terrain=None, scene_objs=scene_objs
@@ -507,8 +518,6 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
                 break
 
     p.save_results(output_folder / "pipeline_coarse.csv")
-
-    place_or_equipment()
 
     return {
         "height_offset": height,

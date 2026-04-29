@@ -3,7 +3,7 @@ from infinigen.core.constraints.example_solver.room.base import room_name
 from infinigen.core.tags import Semantics
 
 
-def angio_room_simple(seed):
+def angio_room(seed):
     """
     Simple rebuild of angiography room at UMM
 

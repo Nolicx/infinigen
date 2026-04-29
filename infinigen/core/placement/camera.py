@@ -250,6 +250,30 @@ def camera_pose_proposal(
     focal_length=50,
     override_loc=None,
 ):
+    """Sample a single candidate camera pose (location, rotation, focal length).
+
+    Two placement modes:
+    - Standard: samples a floor position via `location_sample`, then raises it to the
+      desired `altitude` above the surface using BVH raycasting.
+    - MVS (center_coordinate set): places the camera on a circle of given `radius`
+      around `center_coordinate`, pointing inward with small random noise.
+
+    Args:
+        scene_bvh: BVH tree of the scene used for raycasting.
+        location_sample: callable returning a candidate floor position, or a fixed (x,y,z) tuple.
+        center_coordinate: if set, switches to MVS mode and orbits around this point.
+        radius: orbit radius for MVS mode.
+        bbox: optional (min, max) bounding box; MVS proposals outside it are rejected.
+        altitude: desired camera height above the surface (random_general distribution).
+        roll: camera roll in degrees (random_general distribution).
+        yaw: camera yaw in degrees (random_general distribution).
+        pitch: camera pitch in degrees (random_general distribution).
+        focal_length: focal length in mm (random_general distribution).
+        override_loc: if set, skips sampling and uses this fixed location directly.
+
+    Returns:
+        CameraProposal(loc, rot, focal_length), or None if altitude raycasting fails.
+    """
     if isinstance(location_sample, tuple):
         location_sample = Vector(location_sample)
 
@@ -444,6 +468,34 @@ def compute_base_views(
     visualize=False,
     **kwargs,
 ):
+    """Find and rank the best `n_views` static camera poses for a scene.
+
+    Repeatedly calls `camera_pose_proposal` to generate candidates, scores each via
+    `keep_cam_pose_proposal` on all child cameras of `camera_rig`, and computes a
+    focus distance by raycasting forward from the camera. Returns the top `n_views`
+    poses sorted by score (descending).
+
+    Args:
+        camera_rig: parent rig object whose child cameras are scored.
+        n_views: number of views to return.
+        terrain: terrain object passed to `keep_cam_pose_proposal` for SDF checks.
+        scene_bvh: BVH tree of the scene used for raycasting.
+        location_sample: callable returning candidate floor positions.
+        center_coordinate: if set, enables MVS orbit mode around this point.
+        radius: orbit radius for MVS mode.
+        bbox: optional (min, max) bounding box to constrain MVS proposals.
+        placeholders_kd: KD-tree of placeholder objects for minimum-distance checks.
+        min_candidates_ratio: multiplier on `n_views` for how many candidates to evaluate.
+        max_tries: hard upper limit on proposal attempts before giving up.
+        visualize: if True, spawns empty markers at each attempt location for debugging.
+        **kwargs: forwarded to `keep_cam_pose_proposal`.
+
+    Returns:
+        List of (score, CameraProposal, focus_distance) tuples, length `n_views`.
+
+    Raises:
+        ValueError: if fewer than `n_views` valid poses are found within `max_tries`.
+    """
     potential_views = []
     n_min_candidates = int(min_candidates_ratio * n_views)
 

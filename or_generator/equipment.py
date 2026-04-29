@@ -4,6 +4,8 @@ from pathlib import Path
 import bpy
 import gin
 
+from infinigen.core.util import blender as butil
+
 
 # Alles laden
 def _load_all(blend_path: Path):
@@ -47,6 +49,24 @@ def _set_props(arm_name: str, props: dict):
             arm[key] = value
 
 
+def _armature_to_mesh(armature: bpy.types.Object) -> bpy.types.Object:
+    """Converts an armature and all its child meshes into a single static mesh.
+
+    Child meshes store their position relative to the armature parent. Before
+    joining, the parent relationship is removed while preserving each mesh's
+    world-space transform, so the final mesh ends up at the correct position.
+    The armature is deleted afterwards.
+    """
+    meshes = [c for c in armature.children_recursive if c.type == "MESH"]
+    for mesh in meshes:
+        print(mesh.name, mesh.parent)
+        world_matrix = mesh.matrix_world.copy()
+        mesh.parent = None
+        mesh.matrix_world = world_matrix
+    butil.delete(armature)
+    return butil.join_objects(meshes)
+
+
 @gin.configurable
 def place_or_equipment(
     blend_path: str,
@@ -61,6 +81,7 @@ def place_or_equipment(
 ):
     # _load_all(Path(blend_path))
     _load_for_armatures(Path(blend_path), [zeego_armature, table_armature])
+    armatures = []
     for arm_name, loc, rot_deg, props in [
         (zeego_armature, zeego_location, zeego_rotation_deg, zeego_props),
         (table_armature, table_location, table_rotation_deg, table_props),
@@ -69,4 +90,6 @@ def place_or_equipment(
         arm.location = loc
         arm.rotation_euler = [math.radians(d) for d in rot_deg]
         _set_props(arm_name, props)
-    bpy.context.view_layer.update()
+        bpy.context.view_layer.update()
+        armatures.append(arm)
+    return armatures
