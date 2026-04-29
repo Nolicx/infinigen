@@ -1,10 +1,10 @@
 include 'or_generator/configs/base_or.gin'
 
-Solver.floor_plan = "or_generator.floorplans.angio_room.angio_room_floorplan"
+Solver.floor_plan = "or_generator.configs.floor_plans.angio_room.angio_room_simple"
 
 restrict_solving.solve_max_rooms=2
 
-place_or_equipment.blend_path = "or_generator/assets/zeego/zeego_4_2.blend"
+place_or_equipment.blend_path = "or_generator/assets/static_assets/source/C_Arm/zeego_4_2.blend"
 place_or_equipment.zeego_armature = "zeego_armature"
 place_or_equipment.zeego_location = (4.0, 3.15, 0.28)
 place_or_equipment.zeego_rotation_deg = (0.0, 0.0, 0.0)

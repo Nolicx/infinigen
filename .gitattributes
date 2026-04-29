@@ -13,3 +13,4 @@ Makefile text whitespace=-tab-in-indent,blank-at-eol,tabwidth=4
 *.zip binary
 *.tgz binary
 *.gz binary
+or_generator/assets/static_assets/source/**/*.blend filter=lfs diff=lfs merge=lfs -text

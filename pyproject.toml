@@ -99,7 +99,7 @@ include-package-data = false
 license-files = []
 
 [tool.setuptools.packages.find]
-include = ["infinigen*"]
+include = ["infinigen*", "or_generator"]
 
 # must be specified as module paths with ., using classic filepaths with / will silently not do anything
 exclude = [
@@ -184,4 +184,4 @@ ignore = [
 ban-relative-imports = "parents"
 
 [tool.pytype]
-inputs = ["infinigen", "infinigen_examples"]
+inputs = ["infinigen", "infinigen_examples", "or_generator"]
