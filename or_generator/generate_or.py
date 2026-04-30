@@ -60,6 +60,7 @@ from infinigen_examples.util.generate_indoors_util import (
 from infinigen_examples import (
     generate_nature,  # noqa: F401 # needed for nature gin configs to be loaded
 )
+from .camera_pose import compute_camera_poses_or
 
 from or_generator.equipment import place_or_equipment
 
@@ -236,23 +237,26 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
     nonroom_objs = [
         o.obj for o in state.objs.values() if t.Semantics.Room not in o.tags
     ]
-    # TODO: Load C-ARM as a static asset via static_object_category and manipulate afterwards
-    # Necessary to determinte randomized C-ARM position, employ constraints and to determine the center point of the C-ARM
-    # For now we add C-ARM manually to nonroom_objs
-    angio_armatures = place_or_equipment()
-    # Extract only mesh objects of armature to build scene bvh
-    angio_objs = [
-        c for arm in angio_armatures for c in arm.children if c.type == "MESH"
-    ]
-    nonroom_objs += angio_objs
-
     room_objs = [o.obj for o in state.objs.values() if t.Semantics.Room in o.tags]
     scene_objs = solved_rooms + nonroom_objs
 
+    # TODO: Load C-ARM as a static asset via static_object_category and manipulate afterwards
+    # Necessary to determinte randomized C-ARM position, employ constraints and to determine the center point of the C-ARM
+    angio_armatures = place_or_equipment()
+
     # Customized camera positioning to always focus on angiography system
     def pose_cameras():
+        # Merge mesh parts of angio armatures
+        angio_objs_parts_merged = []
+        for arm in angio_armatures:
+            angio_objs_parts_merged.append(
+                butil.join_objects(
+                    [butil.copy(c) for c in arm.children_recursive if c.type == "MESH"]
+                )
+            )
+
         scene_preprocessed = placement.camera.camera_selection_preprocessing(
-            terrain=None, scene_objs=scene_objs
+            terrain=None, scene_objs=scene_objs + angio_objs_parts_merged
         )
 
         solved_floor_surface = butil.join_objects(
@@ -262,7 +266,7 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
             ]
         )
 
-        poses = cam_traj.compute_poses(
+        poses = compute_camera_poses_or(
             cam_rigs=camera_rigs,
             scene_preprocessed=scene_preprocessed,
             init_surfaces=solved_floor_surface,
@@ -270,6 +274,8 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
         )
 
         butil.delete(solved_floor_surface)
+        # Delete copy of merged angio mesh parts
+        butil.delete(angio_objs_parts_merged)
 
         return poses, scene_preprocessed
 
@@ -528,7 +534,7 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
 def main(args):
     scene_seed = init.apply_scene_seed(args.seed)
     init.apply_gin_configs(
-        configs=["base_indoors.gin"] + args.configs,
+        configs=["base_or.gin"] + args.configs,
         overrides=args.overrides,
         config_folders=[
             "infinigen_examples/configs_indoor",
