@@ -60,7 +60,7 @@ from infinigen_examples.util.generate_indoors_util import (
 from infinigen_examples import (
     generate_nature,  # noqa: F401 # needed for nature gin configs to be loaded
 )
-from .camera_pose import compute_camera_poses_or
+from .camera_pose_or import compute_cam_rigs_poses_or
 
 from or_generator.equipment import place_or_equipment
 
@@ -248,16 +248,18 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
     def pose_cameras():
         # Merge mesh parts of angio armatures
         angio_objs_parts_merged = []
-        for arm in angio_armatures:
+        for arm in angio_armatures.values():
             angio_objs_parts_merged.append(
                 butil.join_objects(
                     [butil.copy(c) for c in arm.children_recursive if c.type == "MESH"]
                 )
             )
-
+        # Creates bvh map used for hit registration via raycasting
         scene_preprocessed = placement.camera.camera_selection_preprocessing(
             terrain=None, scene_objs=scene_objs + angio_objs_parts_merged
         )
+        # Delete copy of merged angio mesh parts
+        butil.delete(angio_objs_parts_merged)
 
         solved_floor_surface = butil.join_objects(
             [
@@ -266,38 +268,34 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
             ]
         )
 
-        poses = compute_camera_poses_or(
+        compute_cam_rigs_poses_or(
             cam_rigs=camera_rigs,
             scene_preprocessed=scene_preprocessed,
-            init_surfaces=solved_floor_surface,
+            angio_armatures=angio_armatures,
+            floor_surface=solved_floor_surface,
             nonroom_objs=nonroom_objs,
         )
 
         butil.delete(solved_floor_surface)
-        # Delete copy of merged angio mesh parts
-        butil.delete(angio_objs_parts_merged)
 
-        return poses, scene_preprocessed
+    p.run_stage("pose_cameras", pose_cameras, use_chance=False, default=(None, None))
 
-    poses, scene_preprocessed = p.run_stage(
-        "pose_cameras", pose_cameras, use_chance=False, default=(None, None)
-    )
+    # Skip animation stage (buggy and currently not used)
+    # def animate_cameras():
+    #     cam_traj.animate_trajectories(
+    #         cam_rigs=camera_rigs,
+    #         base_views=poses,
+    #         scene_preprocessed=scene_preprocessed,
+    #         obj_groups=[room_objs, nonroom_objs],
+    #     )
 
-    def animate_cameras():
-        cam_traj.animate_trajectories(
-            cam_rigs=camera_rigs,
-            base_views=poses,
-            scene_preprocessed=scene_preprocessed,
-            obj_groups=[room_objs, nonroom_objs],
-        )
+    #     frames_folder = output_folder.parent / "frames"
+    #     animated_cams = [cam for cam in camera_rigs if cam.animation_data is not None]
+    #     save_imu_tum_files(frames_folder / "imu_tum", animated_cams)
 
-        frames_folder = output_folder.parent / "frames"
-        animated_cams = [cam for cam in camera_rigs if cam.animation_data is not None]
-        save_imu_tum_files(frames_folder / "imu_tum", animated_cams)
-
-    p.run_stage(
-        "animate_cameras", animate_cameras, use_chance=False, prereq="pose_cameras"
-    )
+    # p.run_stage(
+    #     "animate_cameras", animate_cameras, use_chance=False, prereq="pose_cameras"
+    # )
 
     p.run_stage(
         "populate_intermediate_pholders",

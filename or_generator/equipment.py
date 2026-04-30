@@ -78,10 +78,10 @@ def place_or_equipment(
     table_location=(0.0, 0.0, 0.0),
     table_rotation_deg=(0.0, 0.0, 0.0),
     table_props=None,
-):
+) -> dict:
     # _load_all(Path(blend_path))
     _load_for_armatures(Path(blend_path), [zeego_armature, table_armature])
-    armatures = []
+    armatures = {}
     for arm_name, loc, rot_deg, props in [
         (zeego_armature, zeego_location, zeego_rotation_deg, zeego_props),
         (table_armature, table_location, table_rotation_deg, table_props),
@@ -91,5 +91,5 @@ def place_or_equipment(
         arm.rotation_euler = [math.radians(d) for d in rot_deg]
         _set_props(arm_name, props)
         bpy.context.view_layer.update()
-        armatures.append(arm)
+        armatures[arm_name] = arm
     return armatures

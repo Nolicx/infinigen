@@ -22,3 +22,8 @@ place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
 
 #### Camera pose configuration ####
 
+camera_pose_or.cam_rig_pose_proposal.altitude = ("uniform", 2.0, 3.0)
+camera_pose_or.cam_rig_pose_proposal.roll_noise = ("uniform", -5, 5)
+camera_pose_or.cam_rig_pose_proposal.pitch_noise = ("uniform", -5, 5)
+camera_pose_or.cam_rig_pose_proposal.yaw_noise = ("uniform", -5, 5)
+camera_pose_or.cam_rig_pose_proposal.focal_length = 15 # mm
