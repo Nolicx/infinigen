@@ -3,12 +3,15 @@ include 'infinigen_examples/configs_indoor/fast_solve.gin'
 include 'infinigen_examples/configs_indoor/singleroom.gin'
 include 'infinigen_examples/configs_indoor/disable/no_objects.gin'
 
+#### Stage configuration (which stages should be executed) ####
+
 compose_indoors.terrain_enabled = False
+compose_indoors.animate_cameras_enabled = False
 compose_indoors.floating_objs_enabled = False
 compose_indoors.skirting_floor_enabled = False
 compose_indoors.skirting_ceiling_enabled = False
 
-#### Basic room configuration ####
+#### Room configuration ####
 
 RoomConstants.global_params.wall_height = 3.56
 RoomConstants.global_params.wall_thickness = 0.15
@@ -16,3 +19,26 @@ RoomConstants.global_params.floor_thickness = 0.28
 RoomConstants.global_params.ceiling_thickness = 0.28
 RoomConstants.n_stories = 1
 RoomConstants.fixed_contour = True
+
+#### Camera / Render configuration ####
+
+# Camera resolution
+execute_tasks.generate_resolution = (1280, 720) # bpy.context.scene.render.resolution_x/y
+# Sensor size (has to be consistent with camera resolution)
+get_sensor_coords.W = 1280
+get_sensor_coords.H = 720 
+# Framerate 
+execute_tasks.fps = 24 # bpy.context.scene.render.fps
+# Frame range (used for animation)
+execute_tasks.frame_range = [1, 1] # bpy.context.scene.frame_start/frame_end
+# Set active camera (camera which is used for rendering when task 'render' is executed)
+execute_tasks.camera_id = [0, 0] # camera_rig, subcam
+
+# Spawn 1 cam rig composed of 2 cameras (stereo as a default setting)
+# Number of camera rigs
+camera.spawn_camera_rigs.n_camera_rigs = 1
+# Cameras per camera rig
+camera.spawn_camera_rigs.camera_rig_config = [
+    {'loc': (0, 0, 0), 'rot_euler': (0, 0, 0)}, # first camera
+    {'loc': (0.075, 0, 0), 'rot_euler': (0, 0, 0)} # second camera
+]

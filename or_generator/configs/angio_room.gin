@@ -1,7 +1,7 @@
 include 'or_generator/configs/base_or.gin'
 
 # TODO: Check if 2 is necessary when only one room is used
-restrict_solving.solve_max_rooms=2 
+# restrict_solving.solve_max_rooms=2 
 
 #### Angiography room layout ####
 
@@ -20,12 +20,5 @@ place_or_equipment.table_location = (7.5, 3.15, 0.28)
 place_or_equipment.table_rotation_deg = (180.0, 0.0, 180.0)
 place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
 
-#### Camera placement and animation ####
+#### Camera pose configuration ####
 
-# 1. Setting initial pose of n cameras:
-
-# compute_base_views: Setting initial pose of n cameras
-
-# camera_pose_proposal: Specify sampling strategy to get pose proposals für initial camera position
-
-# 2. Animate n cameras creating nxm frames (m number of frames per camera)
