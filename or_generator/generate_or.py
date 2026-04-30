@@ -254,7 +254,9 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
                     [butil.copy(c) for c in arm.children_recursive if c.type == "MESH"]
                 )
             )
-        # Creates bvh map used for hit registration via raycasting
+        # Used for effective camera positioning
+        # placeholders_kd currently doesn't contain angio_obj_parts (only placeholder objects)
+        # scene_bvh contains angio_obj_parts
         scene_preprocessed = placement.camera.camera_selection_preprocessing(
             terrain=None, scene_objs=scene_objs + angio_objs_parts_merged
         )

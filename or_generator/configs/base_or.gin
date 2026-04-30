@@ -36,7 +36,7 @@ execute_tasks.camera_id = [0, 0] # camera_rig, subcam
 
 # Spawn 1 cam rig composed of 2 cameras (stereo as a default setting)
 # Number of camera rigs
-camera.spawn_camera_rigs.n_camera_rigs = 2
+camera.spawn_camera_rigs.n_camera_rigs = 1
 # Cameras per camera rig
 camera.spawn_camera_rigs.camera_rig_config = [
     {'loc': (0, 0, 0), 'rot_euler': (0, 0, 0)}, # first camera
@@ -44,9 +44,11 @@ camera.spawn_camera_rigs.camera_rig_config = [
 ]
 
 # Candidates per cam rig
-sample_cam_rig_poses_or.n_candidates = 50
+# Only 1 valid candidate necessary for training
+# For showcase of scene increase number to get a better view
+sample_cam_rig_poses_or.n_candidates = 1 
 # Maximum number of iterations to find n_candidates
-sample_cam_rig_poses_or.n_tries = 100
+sample_cam_rig_poses_or.n_tries = 1000
 # Visualize n candidates as an empty entity within blender
 sample_cam_rig_poses_or.visualize = True
 

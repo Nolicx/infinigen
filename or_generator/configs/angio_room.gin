@@ -22,8 +22,17 @@ place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
 
 #### Camera pose configuration ####
 
+# Altitude of cameras
 camera_pose_or.cam_rig_pose_proposal.altitude = ("uniform", 2.0, 3.0)
+
+# Additional rotation noise to avoid looking always exactly at gantry_target
 camera_pose_or.cam_rig_pose_proposal.roll_noise = ("uniform", -5, 5)
 camera_pose_or.cam_rig_pose_proposal.pitch_noise = ("uniform", -5, 5)
 camera_pose_or.cam_rig_pose_proposal.yaw_noise = ("uniform", -5, 5)
 camera_pose_or.cam_rig_pose_proposal.focal_length = 15 # mm
+
+# Mininum distance of camera to objects/terrain (angio system included)
+# Increased distance from default 0.7 to 1.0 m to guarantee visibility of angiography system
+camera.keep_cam_pose_proposal.min_terrain_distance = 1.0
+# Distance to placeholder objects (rooms/objects, !angio system not included!)
+# camera.keep_cam_pose_proposal.min_placeholder_dist = 0

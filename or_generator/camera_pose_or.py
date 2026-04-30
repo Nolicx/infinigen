@@ -24,7 +24,6 @@ def compute_cam_rigs_poses_or(
     floor_surface: list[bpy.types.Object],
     nonroom_objs: list[bpy.types.Object] | None = None,
 ):
-    cam = cam_util.spawn_camera()  # Why?
     bpy.context.view_layer.update()
 
     # Calculate gantry_target position
@@ -43,27 +42,26 @@ def compute_cam_rigs_poses_or(
         return Vector(rng.choice(random_locs))
 
     for cam_rig in cam_rigs:
-        sample_cam_rig_poses_or(
+        candidate_poses = sample_cam_rig_poses_or(
             cam_rig,
             scene_preprocessed=scene_preprocessed,
             center_coordinate=gantry_target_loc,
             sample_location=sample_location,
         )
+        # Pick candidate with the highest score
+        score, pose_proposal, straight_ahead_dists = candidate_poses[0]
+        pose_proposal.apply(cam_rig)
 
-        # score, props, focus_dist = views[0]
-        # cam_rig.location = props.loc
-        # cam_rig.rotation_euler = props.rot
+        for i, cam in enumerate(cam_rig.children):
+            if not cam.type == "CAMERA":
+                continue
 
-        # for cam in cam_rig.children:
-        #     cam.data.lens = props.focal_length
-
-        # if focus_dist is not None:
-        #     for cam in cam_rig.children:
-        #         if not cam.type == "CAMERA":
-        #             continue
-        #         cam.data.dof.focus_distance = focus_dist
-
-    butil.delete(cam)
+            cam.data.lens = pose_proposal.focal_length
+            focus_dist = straight_ahead_dists[i]
+            if focus_dist is not None:
+                cam.data.dof.focus_distance = (
+                    focus_dist  # Used if render_image.use_dof is True (default: False)
+                )
 
 
 @gin.configurable
@@ -96,6 +94,7 @@ def sample_cam_rig_poses_or(
             pose_proposal.apply(cam_rig)
 
             # Check if each cam within the cam rig has a valid pose
+            # keep_cam_pose_proposal ranks proposal with a score (evaluated based on depth variation, min_dist)
             cam_scores = [
                 cam_util.keep_cam_pose_proposal(cam, **scene_preprocessed)
                 for cam in cam_rig.children
