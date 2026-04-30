@@ -246,22 +246,21 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
 
     # Customized camera positioning to always focus on angiography system
     def pose_cameras():
-        # Merge mesh parts of angio armatures
-        angio_objs_parts_merged = []
+        # Merge mesh parts of each angio armature
+        angio_objs_merged = []
         for arm in angio_armatures.values():
-            angio_objs_parts_merged.append(
+            angio_objs_merged.append(
                 butil.join_objects(
                     [butil.copy(c) for c in arm.children_recursive if c.type == "MESH"]
                 )
             )
+
         # Used for effective camera positioning
         # placeholders_kd currently doesn't contain angio_obj_parts (only placeholder objects)
         # scene_bvh contains angio_obj_parts
         scene_preprocessed = placement.camera.camera_selection_preprocessing(
-            terrain=None, scene_objs=scene_objs + angio_objs_parts_merged
+            terrain=None, scene_objs=scene_objs + angio_objs_merged
         )
-        # Delete copy of merged angio mesh parts
-        butil.delete(angio_objs_parts_merged)
 
         solved_floor_surface = butil.join_objects(
             [
@@ -274,11 +273,14 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
             cam_rigs=camera_rigs,
             scene_preprocessed=scene_preprocessed,
             angio_armatures=angio_armatures,
+            angio_objs_merged=angio_objs_merged,
             floor_surface=solved_floor_surface,
             nonroom_objs=nonroom_objs,
         )
 
         butil.delete(solved_floor_surface)
+        # Delete copy of merged angio mesh parts, keep armatures
+        butil.delete(angio_objs_merged)
 
     p.run_stage("pose_cameras", pose_cameras, use_chance=False, default=(None, None))
 

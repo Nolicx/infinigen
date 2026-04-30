@@ -22,8 +22,11 @@ place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
 
 #### Camera pose configuration ####
 
+# Minimum (x,y) margin between possible cameras and angiography system in meters
+camera_pose_or.compute_cam_rigs_poses_or.min_angio_dist = 2.0
+
 # Altitude of cameras
-camera_pose_or.cam_rig_pose_proposal.altitude = ("uniform", 2.0, 3.0)
+camera_pose_or.cam_rig_pose_proposal.altitude = ("uniform", 2.5, 3.5)
 
 # Additional rotation noise to avoid looking always exactly at gantry_target
 camera_pose_or.cam_rig_pose_proposal.roll_noise = ("uniform", -5, 5)

@@ -21,8 +21,10 @@ def compute_cam_rigs_poses_or(
     cam_rigs,
     scene_preprocessed: dict,
     angio_armatures: list[bpy.types.Object],
+    angio_objs_merged: list[bpy.types.Object],
     floor_surface: list[bpy.types.Object],
     nonroom_objs: list[bpy.types.Object] | None = None,
+    min_angio_dist: int = 0,
 ):
     bpy.context.view_layer.update()
 
@@ -35,11 +37,33 @@ def compute_cam_rigs_poses_or(
     gantry_target_loc = gantry_target_matrix.translation
     logging.debug(f"Gantry target located at: {gantry_target_loc}")
 
-    random_locs = cam_util.sample_random_locs(floor_surface)
+    # Compute combined 3D bounds of all angio_objs
+    angio_objs_corners = np.array(
+        [
+            obj.matrix_world @ Vector(c)
+            for obj in angio_objs_merged
+            for c in obj.bound_box
+        ]
+    )
+    bbox_min, bbox_max = (
+        Vector(angio_objs_corners.min(axis=0)),
+        Vector(angio_objs_corners.max(axis=0)),
+    )
+
+    floor_locations = cam_util.sample_random_locs(floor_surface)
+    # Filter all locations inside x,y bounds of angio objs
+    in_angio_area = (
+        (floor_locations[:, 0] >= bbox_min.x - min_angio_dist)
+        & (floor_locations[:, 0] <= bbox_max.x + min_angio_dist)
+        & (floor_locations[:, 1] >= bbox_min.y - min_angio_dist)
+        & (floor_locations[:, 1] <= bbox_max.y + min_angio_dist)
+    )
+    floor_locations = floor_locations[~in_angio_area]
+
     rng = np.random.default_rng()
 
     def sample_location():
-        return Vector(rng.choice(random_locs))
+        return Vector(rng.choice(floor_locations))
 
     for cam_rig in cam_rigs:
         candidate_poses = sample_cam_rig_poses_or(
