@@ -12,6 +12,7 @@ from infinigen.core.util import blender as butil
 from infinigen.core.placement import camera as cam_util
 from infinigen.core.util.random import random_general
 from infinigen.core.placement.animation_policy import get_altitude
+from infinigen.core.constraints.constraint_language.constants import RoomConstants
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ def compute_cam_rigs_poses_or(
     angio_armatures: list[bpy.types.Object],
     angio_objs_merged: list[bpy.types.Object],
     floor_surface: list[bpy.types.Object],
+    room_constants: RoomConstants,
     nonroom_objs: list[bpy.types.Object] | None = None,
     min_angio_dist: int = 0,
 ):
@@ -51,6 +53,19 @@ def compute_cam_rigs_poses_or(
     )
 
     floor_locations = cam_util.sample_random_locs(floor_surface)
+    # Cut out wall thickness
+    xy = floor_locations[:, :2]
+    margin = room_constants.wall_thickness
+    x_min, y_min = xy.min(axis=0) + margin
+    x_max, y_max = xy.max(axis=0) - margin
+    in_interior = (
+        (xy[:, 0] >= x_min)
+        & (xy[:, 0] <= x_max)
+        & (xy[:, 1] >= y_min)
+        & (xy[:, 1] <= y_max)
+    )
+    floor_locations = floor_locations[in_interior]
+
     # Filter all locations inside x,y bounds of angio objs
     in_angio_area = (
         (floor_locations[:, 0] >= bbox_min.x - min_angio_dist)

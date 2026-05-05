@@ -275,6 +275,7 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
             angio_armatures=angio_armatures,
             angio_objs_merged=angio_objs_merged,
             floor_surface=solved_floor_surface,
+            room_constants=constants,
             nonroom_objs=nonroom_objs,
         )
 
