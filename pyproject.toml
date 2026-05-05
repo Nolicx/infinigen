@@ -18,7 +18,6 @@ requires-python = "==3.11.*"
 dependencies = [
   # NOTE: many less-than dependencies could likely be loosened
   #   we attempted to restrict to only versions that are known to be working
-
   "OpenEXR",
   "bpy==4.2.0",
   "gin_config>=0.5.0",
@@ -35,14 +34,12 @@ dependencies = [
   "shapely<=2.0.5",
   "tqdm",
   "trimesh<3.23.0",
-
   "submitit",  # can be removed so long as you dont use slurm.gin or --slurm args
-
   "geomdl",  # can be removed so long as you do not generate any creatures
-
   # used by trimesh, we could specify "trimesh[easy]" but this brings more packages
   "python-fcl",
   "rtree",
+  "pyyaml>=6.0.3",
 ]
 
 [project.optional-dependencies]

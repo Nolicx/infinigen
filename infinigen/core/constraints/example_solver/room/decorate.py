@@ -77,6 +77,9 @@ def split_rooms(rooms_meshed: list[bpy.types.Object]):
         for m in m2delete:
             ms.remove(m)
 
+    for k, ms in list(meshes.items()):
+        meshes[k] = [m for m in ms if len(m.data.vertices) > 0]
+
     meshes["exterior"] = [
         tagging.extract_mask(r, 1 - tagging.tagged_face_mask(r, t.Subpart.Visible))
         for r in rooms_meshed
@@ -224,7 +227,7 @@ def room_walls(walls: list[bpy.types.Object], constants: RoomConstants, n_walls=
             if wall_fn.__class__.__name__ == "Plaster":
                 for r in rooms__:
                     unwrap_normal(r, selection=None)
-            if wall_fn.__class__.__name__ == "Brick":
+            if wall_fn.__class__.__name__ in ("Brick", "Concrete", "Plaster"):
                 kwargs = {}
             surface.assign_material(rooms__, wall_fn(**kwargs))
 

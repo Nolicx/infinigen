@@ -43,6 +43,7 @@ from infinigen.core.util.random import random_general as rg
 
 from .base import RoomGraph, room_type, valid_rooms
 from .utils import mls_ccw
+from shapely.geometry import Polygon
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,8 @@ class BlueprintSolidifier:
         self.level = level
         self.enable_open = enable_open
 
+        self._wall_panels = {}
+
     @staticmethod
     def unroll(x):
         for k, cs in x.items():
@@ -220,6 +223,12 @@ class BlueprintSolidifier:
         exterior_shape = state[exterior].polygon
 
         rooms = {k: self.make_room(state, k) for k, _ in valid_rooms(state)}
+
+        wall_col = butil.get_collection("unique_assets:room_wall")
+        for panels in self._wall_panels.values():
+            for panel, _, _ in panels:
+                butil.put_in_collection(panel, wall_col)
+
         valid_neighbours = (
             self.graph.valid_neighbours if self.graph is not None else None
         )
@@ -264,6 +273,9 @@ class BlueprintSolidifier:
         )
         for obj in rooms_.values():
             tagging.tag_object(obj)
+        for panels in self._wall_panels.values():
+            for panel, _, _ in panels:
+                tagging.tag_object(panel)
 
         # Cut windows & doors from final room meshes
         cutter_col = butil.get_collection("placeholders:portal_cutters")
@@ -271,13 +283,19 @@ class BlueprintSolidifier:
             for k, c in self.unroll(cutters):
                 butil.put_in_collection(c, cutter_col)
                 for k_ in k:
-                    obj = rooms[k_]
+                    # obj = rooms[k_]
+                    if k_ in self._wall_panels:
+                        obj = find_wall_panel(
+                            self._wall_panels[k_], np.array(c.location[:2])
+                        )
+                    else:
+                        obj = rooms[k_]
                     logger.debug(f"Cutting {c.name} from {obj.name}")
                     before = len(obj.data.polygons)
                     prepare_for_boolean(obj)
                     prepare_for_boolean(c)
                     butil.modify_mesh(
-                        rooms[k_],
+                        obj,
                         "BOOLEAN",
                         object=c,
                         operation="DIFFERENCE",
@@ -386,124 +404,6 @@ class BlueprintSolidifier:
 
         return State(objs=obj_states)
 
-    # def make_room(self, state, name):
-    #     obj_st = state.objs[name]
-    #     obj = polygon2obj(
-    #         shapely.segmentize(
-    #             self.constants.canonicalize(obj_st.polygon), self.constants.door_width
-    #         ),
-    #         True,
-    #         dissolve=False,
-    #     )
-    #     butil.modify_mesh(obj, "WELD", merge_threshold=0.01)
-    #     butil.modify_mesh(
-    #         obj, "SOLIDIFY", thickness=self.constants.wall_height, offset=-1
-    #     )
-    #     obj.name = name
-    #     self.tag(obj, False)
-    #     center = read_center(obj)
-    #     exterior_centers = []
-
-    #     exterior = next(k for k in state.objs if room_type(k) == Semantics.Exterior)
-    #     exterior_edges = list(
-    #         r.value for r in state.objs[exterior].relations if r.target_name == name
-    #     )
-    #     if len(exterior_edges) == 0:
-    #         exterior = np.zeros(len(obj.data.polygons), dtype=bool)
-    #     else:
-    #         exterior_edge = exterior_edges[0]
-    #         for ls in exterior_edge.geoms:
-    #             for u, v in zip(ls.coords[:-1], ls.coords[1:]):
-    #                 exterior_centers.append(((u[0] + v[0]) / 2, (u[1] + v[1]) / 2))
-    #         if len(exterior_centers) > 0:
-    #             exterior = (
-    #                 np.abs(
-    #                     center[:, np.newaxis, :2]
-    #                     - np.array(exterior_centers)[np.newaxis]
-    #                 ).sum(-1)
-    #                 < self.constants.wall_thickness * 4
-    #             ).any(-1)
-    #         else:
-    #             exterior = np.zeros(len(obj.data.polygons), dtype=bool)
-    #     write_attr_data(
-    #         obj, f"{PREFIX}{t.Subpart.Interior.value}", ~exterior, "BOOLEAN", "FACE"
-    #     )
-    #     assert len(obj.data.vertices) > 0
-
-    #     # floor and ceiling masks
-    #     floor_mask = read_attr_data(
-    #         obj, f"{PREFIX}{t.Subpart.SupportSurface.value}", "FACE"
-    #     ).astype(bool)
-    #     ceiling_mask = read_attr_data(
-    #         obj, f"{PREFIX}{t.Subpart.Ceiling.value}", "FACE"
-    #     ).astype(bool)
-
-    #     # Generate sub-objects for surface and ceiling
-    #     sub_objects = []
-    #     for mask, thickness in [
-    #         (floor_mask, self.constants.floor_thickness),
-    #         (ceiling_mask, self.constants.ceiling_thickness),
-    #     ]:
-    #         if not mask.any():
-    #             continue
-    #         sub = obj.copy()
-    #         sub.data = obj.data.copy()
-    #         bpy.context.collection.objects.link(sub)
-    #         # delete non-fitting faces
-    #         bpy.context.view_layer.objects.active = sub
-    #         bpy.ops.object.mode_set(mode="OBJECT")
-    #         for i, poly in enumerate(sub.data.polygons):
-    #             poly.select = not mask[i]
-    #         bpy.ops.object.mode_set(mode="EDIT")
-    #         bpy.ops.mesh.delete(type="FACE")
-    #         bpy.ops.object.mode_set(mode="OBJECT")
-    #         # apply own thickness
-    #         sub.vertex_groups.new(name="visible_")
-    #         butil.modify_mesh(
-    #             sub,
-    #             "SOLIDIFY",
-    #             thickness=thickness,
-    #             offset=-1,
-    #             use_even_offset=True,
-    #             shell_vertex_group="visible_",
-    #             use_quality_normals=True,
-    #         )
-    #         write_attribute(
-    #             sub, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
-    #         )
-    #         sub.vertex_groups.remove(sub.vertex_groups["visible_"])
-    #         sub_objects.append(sub)
-
-    #     # delete original floor and ceiling
-    #     bpy.context.view_layer.objects.active = obj
-    #     combined_mask = floor_mask | ceiling_mask
-    #     bpy.ops.object.mode_set(mode="OBJECT")
-    #     for i, poly in enumerate(obj.data.polygons):
-    #         poly.select = combined_mask[i]
-    #     bpy.ops.object.mode_set(mode="EDIT")
-    #     bpy.ops.mesh.delete(type="FACE")
-    #     bpy.ops.object.mode_set(mode="OBJECT")
-
-    #     obj.vertex_groups.new(name="visible_")
-    #     butil.modify_mesh(
-    #         obj,
-    #         "SOLIDIFY",
-    #         thickness=self.constants.wall_thickness / 2,
-    #         offset=-1,
-    #         use_even_offset=True,
-    #         shell_vertex_group="visible_",
-    #         use_quality_normals=True,
-    #     )
-    #     write_attribute(
-    #         obj, "visible_", f"{PREFIX}{t.Subpart.Visible.value}", "FACE", "BOOLEAN"
-    #     )
-    #     obj.vertex_groups.remove(obj.vertex_groups["visible_"])
-
-    #     # connect all parts
-    #     if sub_objects:
-    #         obj = butil.join_objects([obj] + sub_objects)
-    #     return obj
-
     def make_room(self, state, name):
         obj_st = state.objs[name]
         ft = self.constants.floor_thickness
@@ -520,43 +420,40 @@ class BlueprintSolidifier:
         # outer_poly = inner_poly.buffer(wt, join_style="mitre")
 
         # So gibt man die Gesamtmaße, also Innen + Wände/Decke/Böden an, aber bei mehreren Räumen gibts keine Überlappungen
-        room_poly = shapely.segmentize(
-            self.constants.canonicalize(obj_st.polygon), self.constants.door_width
-        )
+        base_poly = self.constants.canonicalize(obj_st.polygon)
+
+        room_poly = shapely.segmentize(base_poly, self.constants.door_width)
         outer_poly = room_poly
-        inner_poly = room_poly.buffer(-wt, join_style="mitre")
+        outer_wall = base_poly
+        # inner_poly = base_poly.buffer(-wt, join_style="mitre")
 
         # Floor slab: inner polygon, z=0 bis z=ft
-        floor_obj = polygon2obj(inner_poly, reversed=True, dissolve=False)
+        floor_obj = polygon2obj(outer_poly, reversed=True, dissolve=False)
         butil.modify_mesh(floor_obj, "WELD", merge_threshold=0.01)
         butil.modify_mesh(floor_obj, "SOLIDIFY", thickness=ft, offset=-1)
 
         # Wall ring: outer box minus inner box (Boolean), z=ft bis z=wh-ct
-        wall_obj = polygon2obj(outer_poly, z=ft, reversed=True, dissolve=False)
-        butil.modify_mesh(wall_obj, "WELD", merge_threshold=0.01)
-        butil.modify_mesh(wall_obj, "SOLIDIFY", thickness=interior_height, offset=-1)
+        outer_coords = list(outer_wall.exterior.coords[:-1])
+        wall_panels = []
+        for i in range(len(outer_coords)):
+            i_next = (i + 1) % len(outer_coords)
+            a = np.array(outer_coords[i][:2])
+            b = np.array(outer_coords[i_next][:2])
+            edge = b - a
+            # Einwärts-Normale für CCW-Polygon (linke Normale)
+            n = np.array([-edge[1], edge[0]])
+            n = n / np.linalg.norm(n) * wt
+            panel_poly = Polygon([tuple(a), tuple(b), tuple(b + n), tuple(a + n)])
+            panel = polygon2obj(panel_poly, z=ft, reversed=True, dissolve=False)
+            butil.modify_mesh(panel, "WELD", merge_threshold=0.01)
+            butil.modify_mesh(panel, "SOLIDIFY", thickness=interior_height, offset=-1)
+            wall_panels.append(panel)
 
-        wall_cutter = polygon2obj(
-            inner_poly, z=ft - 0.001, reversed=True, dissolve=False
-        )
-        butil.modify_mesh(wall_cutter, "WELD", merge_threshold=0.01)
-        butil.modify_mesh(
-            wall_cutter, "SOLIDIFY", thickness=interior_height + 0.002, offset=-1
-        )
-        prepare_for_boolean(wall_obj)
-        prepare_for_boolean(wall_cutter)
-        butil.modify_mesh(
-            wall_obj,
-            "BOOLEAN",
-            object=wall_cutter,
-            operation="DIFFERENCE",
-            use_self=True,
-            use_hole_tolerant=True,
-        )
-        bpy.data.objects.remove(wall_cutter, do_unlink=True)
+        for i, panel in enumerate(wall_panels):
+            panel.name = f"{name}.wall.{i:02d}"
 
         # Ceiling slab: inner polygon, z=wh-ct bis z=wh
-        ceil_obj = polygon2obj(inner_poly, z=wh - ct, reversed=True, dissolve=False)
+        ceil_obj = polygon2obj(outer_poly, z=wh - ct, reversed=True, dissolve=False)
         butil.modify_mesh(ceil_obj, "WELD", merge_threshold=0.01)
         butil.modify_mesh(ceil_obj, "SOLIDIFY", thickness=ct, offset=-1)
 
@@ -570,16 +467,22 @@ class BlueprintSolidifier:
             for ls in ee.geoms:
                 for u, v in zip(ls.coords[:-1], ls.coords[1:]):
                     exterior_centers.append(((u[0] + v[0]) / 2, (u[1] + v[1]) / 2))
+        panel_midpoints = [
+            (
+                (outer_coords[i][0] + outer_coords[(i + 1) % len(outer_coords)][0]) / 2,
+                (outer_coords[i][1] + outer_coords[(i + 1) % len(outer_coords)][1]) / 2,
+            )
+            for i in range(len(outer_coords))
+        ]
         if exterior_centers:
-            center = read_center(wall_obj) + wall_obj.location
-            is_exterior = (
-                np.abs(
-                    center[:, np.newaxis, :2] - np.array(exterior_centers)[np.newaxis]
-                ).sum(-1)
-                < wt * 4
-            ).any(-1)
+            is_exterior_panel = [
+                (
+                    np.abs(np.array(mid) - np.array(exterior_centers)).sum(-1) < wt * 4
+                ).any()
+                for mid in panel_midpoints
+            ]
         else:
-            is_exterior = np.zeros(len(wall_obj.data.polygons), bool)
+            is_exterior_panel = [False] * len(wall_panels)
 
         # Tagging
         def tag_slab(obj, floor=False, wall=False, ceiling=False, exterior_mask=None):
@@ -616,10 +519,22 @@ class BlueprintSolidifier:
             )
 
         tag_slab(floor_obj, floor=True)
-        tag_slab(wall_obj, wall=True, exterior_mask=is_exterior)
         tag_slab(ceil_obj, ceiling=True)
+        # tag_slab(wall_obj, wall=True, exterior_mask=is_exterior)
+        for panel, is_ext in zip(wall_panels, is_exterior_panel):
+            n = len(panel.data.polygons)
+            exterior_mask = np.ones(n, bool) if is_ext else np.zeros(n, bool)
+            tag_slab(panel, wall=True, exterior_mask=exterior_mask)
+            self._wall_panels[name] = [
+                (
+                    panel,
+                    np.array(outer_coords[i][:2]),
+                    np.array(outer_coords[(i + 1) % len(outer_coords)][:2]),
+                )
+                for i, panel in enumerate(wall_panels)
+            ]
 
-        obj = butil.join_objects([floor_obj, wall_obj, ceil_obj])
+        obj = butil.join_objects([floor_obj, ceil_obj])
         obj.name = name
         assert len(obj.data.vertices) > 0
         return obj
@@ -738,23 +653,34 @@ class BlueprintSolidifier:
         cutter = new_cube()
         vertical = np.abs(x - x_) < 0.1
         wt = self.constants.wall_thickness
+        ft = self.constants.floor_thickness
         cutter.scale = (
             self.constants.door_width / 2,
             self.constants.door_width + wt / 2,
-            self.constants.door_size / 2 - _snap / 2,
+            self.constants.door_size / 2 + ft / 4,
         )
-        cutter.location[-1] += _snap / 2
+        # cutter.location[-1] -= ft / 4
         butil.apply_transform(cutter, True)
         if vertical:
             y = uniform(min(y, y_) + m, max(y, y_) - m)
             z_rot = -np.pi / 2 if direction[0] > 0 else np.pi / 2
+            dx = x_ - x
+            dy = y_ - y
+            length = np.linalg.norm([dx, dy])
+            x += -(dy / length) * wt
+            y += (dx / length) * wt
         else:
             x = uniform(min(x, x_) + m, max(x, x_) - m)
             z_rot = 0 if direction[1] > 0 else np.pi
+            dx = x_ - x
+            dy = y_ - y
+            length = np.linalg.norm([dx, dy])
+            x += -(dy / length) * wt
+            y += (dx / length) * wt
         cutter.location = (
             x,
             y,
-            self.constants.door_size / 2 + self.constants.floor_thickness,
+            self.constants.door_size / 2 + ft,
         )
         cutter.rotation_euler[-1] = z_rot
         cutter.name = t.Semantics.Door.value
@@ -768,17 +694,18 @@ class BlueprintSolidifier:
         m = self.constants.door_margin + self.constants.door_width / 2
         lam = uniform(m / length, 1 - m / length)
         wt = self.constants.wall_thickness
+        ft = self.constants.floor_thickness
         cutter.scale = (
             self.constants.door_width / 2,
             self.constants.door_width / 2 + wt,
-            self.constants.door_size / 2 - _snap / 2,
+            self.constants.door_size / 2 + ft / 2,  # _snap / 2,
         )
-        cutter.location[-1] += _snap / 2
+        # cutter.location[-1] += _snap / 2
         butil.apply_transform(cutter, True)
         cutter.location = (
             lam * x + (1 - lam) * x_,
             lam * y + (1 - lam) * y_,
-            self.constants.door_size / 2 + self.constants.floor_thickness,
+            self.constants.door_size / 2 + ft,  # self.constants.floor_thickness / 2,
         )
         cutter.rotation_euler = 0, 0, np.arctan2(y_ - y, x_ - x)
         cutter.name = t.Semantics.Entrance.value
@@ -789,8 +716,6 @@ class BlueprintSolidifier:
         cutters = []
         for x, y, x_, y_ in split_mls(mls, self.constants.door_width):
             length = np.linalg.norm([y_ - y, x_ - x])
-            # wt = self.constants.wall_thickness
-            # wm = self.constants.window_margin
             wt = self.constants.wall_thickness
             wm = self.constants.window_margin
             ft = self.constants.floor_thickness
@@ -811,7 +736,17 @@ class BlueprintSolidifier:
             cutter = new_cube()
             cutter.scale = x_scale, wt, z_scale
             butil.apply_transform(cutter)
-            cutter.location = lam * x + (1 - lam) * x_, lam * y + (1 - lam) * y_, z_loc
+
+            dx = x_ - x
+            dy = y_ - y
+            length = np.linalg.norm([dx, dy])
+            nx = -(dy / length) * wt
+            ny = (dx / length) * wt
+            cutter.location = (
+                lam * x + (1 - lam) * x_ - nx,
+                lam * y + (1 - lam) * y_ - ny,
+                z_loc,
+            )
             cutter.rotation_euler = 0, 0, np.arctan2(y - y_, x - x_)
             cutter.name = t.Semantics.Window.value
             self.tag(cutter)
@@ -897,3 +832,16 @@ class BlueprintSolidifier:
         write_attr_data(
             obj, f"{PREFIX}{t.Subpart.Interior.value}", full, "BOOLEAN", "FACE"
         )
+
+
+def find_wall_panel(panels_with_edges, cutter_xy):
+    return min(
+        panels_with_edges,
+        key=lambda x: _point_to_segment_dist(cutter_xy, x[1], x[2]),
+    )[0]
+
+
+def _point_to_segment_dist(p, a, b):
+    ab = b - a
+    t = np.clip(np.dot(p - a, ab) / np.dot(ab, ab), 0, 1)
+    return np.linalg.norm(p - (a + t * ab))

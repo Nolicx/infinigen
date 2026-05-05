@@ -32,7 +32,7 @@ execute_tasks.fps = 24 # bpy.context.scene.render.fps
 # Frame range (used for animation)
 execute_tasks.frame_range = [1, 1] # bpy.context.scene.frame_start/frame_end
 # Set active camera (camera which is used for rendering when task 'render' is executed)
-execute_tasks.camera_id = [0, 0] # camera_rig, subcam
+execute_tasks.camera_id = [27, 0] # camera_rig, subcam
 
 # Number of camera rigs
 camera.spawn_camera_rigs.n_camera_rigs = 50
