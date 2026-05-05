@@ -42,11 +42,12 @@ def _load_for_armatures(blend_path: Path, armature_names: list):
 def _set_props(arm_name: str, props: dict):
     arm = bpy.data.objects[arm_name]
     for key, value in (props or {}).items():
+        convert = "_rot" in key
         if isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
-                arm[key][i] = v
+                arm[key][i] = math.radians(v) if convert else v
         else:
-            arm[key] = value
+            arm[key] = math.radians(value) if convert else value
 
 
 def _armature_to_mesh(armature: bpy.types.Object) -> bpy.types.Object:

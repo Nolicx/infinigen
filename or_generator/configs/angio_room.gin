@@ -1,7 +1,7 @@
 include 'or_generator/configs/base_or.gin'
 
 # TODO: Check if 2 is necessary when only one room is used
-# restrict_solving.solve_max_rooms=2 
+# restrict_solving.solve_max_rooms=2
 
 #### Angiography room layout ####
 
