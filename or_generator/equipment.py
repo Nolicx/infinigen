@@ -4,50 +4,53 @@ from pathlib import Path
 import bpy
 import gin
 
-from infinigen.core.util import blender as butil
 
-
-# Alles laden
-def _load_all(blend_path: Path):
-    with bpy.data.libraries.load(str(blend_path), link=False) as (src, dst):
-        dst.objects = list(src.objects)
-    for obj in dst.objects:
-        if obj is not None:
-            bpy.context.collection.objects.link(obj)
+def _iter_coll_objects(coll):
+    yield from coll.objects
+    for child in coll.children:
+        yield from _iter_coll_objects(child)
 
 
 # Nur laden, was eine Armature hat
-def _load_for_armatures(blend_path: Path, armature_names: list):
+def load_collections(
+    blend_path: Path, collection_names: list[str], armature_names: list[str]
+):
     with bpy.data.libraries.load(str(blend_path), link=False) as (src, dst):
-        dst.collections = list(src.collections)
-        dst.objects = list(src.objects)
+        dst.collections = [c for c in src.collections if c in collection_names]
 
-    child_colls = {c.name for coll in dst.collections if coll for c in coll.children}
     for coll in dst.collections:
-        # if coll is not None and coll.name not in child_colls:
-        #     bpy.context.scene.collection.children.link(coll)
-        if coll is None or coll.name in child_colls:
+        if coll is not None:
+            bpy.context.scene.collection.children.link(coll)
+
+    all_object_names = [
+        obj.name for coll in dst.collections if coll for obj in _iter_coll_objects(coll)
+    ]
+
+    armature_names_set = set(armature_names)
+    to_keep_names = set(armature_names_set)
+
+    for name in all_object_names:
+        if name not in bpy.data.objects:
             continue
-        if len(coll.objects) == 0:
-            for child in coll.children:
-                bpy.context.scene.collection.children.link(child)
-            bpy.data.collections.remove(coll)
-        else:
-            bpy.contect.scene.collection.children.link(coll)
-
-    armatures = {bpy.data.objects[n] for n in armature_names if n in bpy.data.objects}
-    to_keep = set(armatures)
-    for obj in (o for o in dst.objects if o is not None):
+        obj = bpy.data.objects[name]
         for mod in obj.modifiers:
-            if mod.type == "ARMATURE" and mod.object in armatures:
-                to_keep.add(obj)
+            if (
+                mod.type == "ARMATURE"
+                and mod.object
+                and mod.object.name in armature_names_set
+            ):
+                to_keep_names.add(name)
                 break
-        if obj.parent in armatures:
-            to_keep.add(obj)
+        if obj.parent and obj.parent.name in armature_names_set:
+            to_keep_names.add(name)
 
-    for obj in (o for o in dst.objects if o is not None):
-        if obj not in to_keep:
-            bpy.data.objects.remove(obj, do_unlink=True)
+    for name in all_object_names:
+        if name not in to_keep_names and name in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
+
+    for coll in list(bpy.context.scene.collection.children):
+        if len(coll.objects) == 0 and len(coll.children) == 0:
+            bpy.data.collections.remove(coll)
 
 
 def _set_props(arm_name: str, props: dict):
@@ -61,38 +64,26 @@ def _set_props(arm_name: str, props: dict):
             arm[key] = math.radians(value) if convert else value
 
 
-def _armature_to_mesh(armature: bpy.types.Object) -> bpy.types.Object:
-    """Converts an armature and all its child meshes into a single static mesh.
-
-    Child meshes store their position relative to the armature parent. Before
-    joining, the parent relationship is removed while preserving each mesh's
-    world-space transform, so the final mesh ends up at the correct position.
-    The armature is deleted afterwards.
-    """
-    meshes = [c for c in armature.children_recursive if c.type == "MESH"]
-    for mesh in meshes:
-        print(mesh.name, mesh.parent)
-        world_matrix = mesh.matrix_world.copy()
-        mesh.parent = None
-        mesh.matrix_world = world_matrix
-    butil.delete(armature)
-    return butil.join_objects(meshes)
-
-
 @gin.configurable
 def place_or_equipment(
     blend_path: str,
+    zeego_collection: str = "zeego",
     zeego_armature: str = "zeego_armature",
     zeego_location=(0.0, 0.0, 0.0),
     zeego_rotation_deg=(0.0, 0.0, 0.0),
     zeego_props=None,
+    table_collection: str = "table",
     table_armature: str = "table_armature",
     table_location=(0.0, 0.0, 0.0),
     table_rotation_deg=(0.0, 0.0, 0.0),
     table_props=None,
 ) -> dict:
     # _load_all(Path(blend_path))
-    _load_for_armatures(Path(blend_path), [zeego_armature, table_armature])
+    load_collections(
+        Path(blend_path),
+        [zeego_collection, table_collection],
+        [zeego_armature, table_armature],
+    )
     armatures = {}
     for arm_name, loc, rot_deg, props in [
         (zeego_armature, zeego_location, zeego_rotation_deg, zeego_props),
