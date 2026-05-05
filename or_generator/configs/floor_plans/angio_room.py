@@ -26,10 +26,18 @@ def angio_room(seed):
             },  ## 9.75 + 2×0.15, 6.0 + 2×0.15
         },
         "windows": {
-            "window": {
-                "shape": LineString([(3.025, 6.3), (6.025, 6.3)]),
+            "window_1": {
+                "shape": LineString([(1.025, 6.3), (3.025, 6.3)]),
+                "is_panoramic": True,
+            },
+            "window_2": {
+                "shape": LineString([(4.025, 6.3), (6.025, 6.3)]),
                 "is_panoramic": False,
-            }
+            },
+            "window_3": {
+                "shape": LineString([(7.025, 6.3), (9.025, 6.3)]),
+                "is_panoramic": False,
+            },
         },
         "doors": {
             "door": {

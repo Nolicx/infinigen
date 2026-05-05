@@ -724,8 +724,8 @@ class BlueprintSolidifier:
             if rg(is_panoramic) and self.constants.wall_height < 4:
                 x_scale = length / 2 - wm
                 lam = 1 / 2
-                z_scale = self.constants.wall_height / 2 - max(ft, ct) - _snap
-                z_loc = z_scale + max(ft, ct) + _snap
+                z_scale = (self.constants.wall_height - max(ft, ct) - ft) / 2
+                z_loc = ft + z_scale
             else:
                 x_scale = uniform(self.constants.door_width / 2, length / 2 - wm)
                 m = (x_scale + wm) / length
