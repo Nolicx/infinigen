@@ -19,10 +19,21 @@ def _load_all(blend_path: Path):
 # Nur laden, was eine Armature hat
 def _load_for_armatures(blend_path: Path, armature_names: list):
     with bpy.data.libraries.load(str(blend_path), link=False) as (src, dst):
+        dst.collections = list(src.collections)
         dst.objects = list(src.objects)
-    for obj in dst.objects:
-        if obj is not None:
-            bpy.context.collection.objects.link(obj)
+
+    child_colls = {c.name for coll in dst.collections if coll for c in coll.children}
+    for coll in dst.collections:
+        # if coll is not None and coll.name not in child_colls:
+        #     bpy.context.scene.collection.children.link(coll)
+        if coll is None or coll.name in child_colls:
+            continue
+        if len(coll.objects) == 0:
+            for child in coll.children:
+                bpy.context.scene.collection.children.link(child)
+            bpy.data.collections.remove(coll)
+        else:
+            bpy.contect.scene.collection.children.link(coll)
 
     armatures = {bpy.data.objects[n] for n in armature_names if n in bpy.data.objects}
     to_keep = set(armatures)

@@ -667,16 +667,16 @@ class BlueprintSolidifier:
             dx = x_ - x
             dy = y_ - y
             length = np.linalg.norm([dx, dy])
-            x += -(dy / length) * wt
-            y += (dx / length) * wt
+            x += (dy / length) * wt / 2
+            y += -(dx / length) * wt / 2
         else:
             x = uniform(min(x, x_) + m, max(x, x_) - m)
             z_rot = 0 if direction[1] > 0 else np.pi
             dx = x_ - x
             dy = y_ - y
             length = np.linalg.norm([dx, dy])
-            x += -(dy / length) * wt
-            y += (dx / length) * wt
+            x += -(dy / length) * wt / 2
+            y += (dx / length) * wt / 2
         cutter.location = (
             x,
             y,

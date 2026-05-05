@@ -11,9 +11,9 @@ Solver.floor_plan = "or_generator.configs.floor_plans.angio_room.angio_room"
 
 place_or_equipment.blend_path = "or_generator/assets/static_assets/source/AngiographySystem/zeego_4_2.blend"
 place_or_equipment.zeego_armature = "zeego_armature"
-place_or_equipment.zeego_location = (4.0, 3.15, 0.28)
+place_or_equipment.zeego_location = (4.0, 3.01, 0.28) # 14cm als static offset
 place_or_equipment.zeego_rotation_deg = (0.0, 0.0, 0.0)
-place_or_equipment.zeego_props = {"gantry_pos": [0.0, 0.0, 0.0],"gantry_rot": [0.0, 0.0, 0.0], "gantry_opening": 0.0}
+place_or_equipment.zeego_props = {"gantry_pos": [0.0, 0.0, 0.0],"gantry_rot": [10.0, 20.0, 0.0], "gantry_opening": 0.0}
 
 place_or_equipment.table_armature = "table_armature"
 place_or_equipment.table_location = (7.5, 3.15, 0.28)
@@ -23,7 +23,7 @@ place_or_equipment.table_props = {"bed_pos": [0.0, 0.0, 0.0], "bed_rot_z": 0.0}
 #### Camera pose configuration ####
 
 # Minimum (x,y) margin between possible cameras and angiography system in meters
-camera_pose_or.compute_cam_rigs_poses_or.min_angio_dist = 2.0
+camera_pose_or.compute_cam_rigs_poses_or.min_angio_dist = 1.0
 
 # Altitude of cameras
 camera_pose_or.cam_rig_pose_proposal.altitude = ("uniform", 2.5, 3.5)

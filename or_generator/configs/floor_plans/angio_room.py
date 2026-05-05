@@ -28,7 +28,7 @@ def angio_room(seed):
         "windows": {
             "window_1": {
                 "shape": LineString([(1.025, 6.3), (3.025, 6.3)]),
-                "is_panoramic": True,
+                "is_panoramic": False,
             },
             "window_2": {
                 "shape": LineString([(4.025, 6.3), (6.025, 6.3)]),
@@ -40,10 +40,15 @@ def angio_room(seed):
             },
         },
         "doors": {
-            "door": {
+            "door_1": {
                 "shape": LineString(
-                    [(2.5, 0), (3.5, 0)]
+                    [(1.5, 0), (2.5, 0)]
                 )  # 1m breite Tür auf der Südwand
-            }
+            },
+            "door_2": {
+                "shape": LineString(
+                    [(10.05, 1.5), (10.05, 2.5)]
+                )  # 1m breite Tür auf der Südwand
+            },
         },
     }
